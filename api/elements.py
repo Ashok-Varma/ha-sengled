@@ -74,15 +74,29 @@ def _encode_color_temp(value_mireds: int, min_mireds: int, max_mireds: int) -> s
 
 
 class ElementsBulb(APIBulb):
-    """A Wifi Elements bulb."""
+    """A WiFi Elements bulb that dynamically supports features based on its discovery attributes."""
 
     _data: dict[str, str]
     _api: API  # Expected from mixed-in class
+    _supports_color: bool = False
+    _supports_brightness: bool = False
+    _supports_color_temp: bool = False
 
     def __init__(self, discovery: dict[str, Any]) -> None:
-        """Initialize the ElementsBulb."""
+        """Initialize the ElementsBulb and determine supported features."""
         _LOGGER.debug(f"{self.__class__.__name__} init {discovery}")
         self._data = _hassify_discovery(discovery)
+
+        # Parse the supported attributes
+        support_attributes = self._data.get("supportAttributes", "").split(",")
+        self._supports_brightness = "brightness" in support_attributes
+        self._supports_color = "color" in support_attributes
+        self._supports_color_temp = "colorTemperature" in support_attributes
+
+        _LOGGER.info(
+            f"{self.name} supports: brightness={self._supports_brightness}, "
+            f"color={self._supports_color}, color temperature={self._supports_color_temp}"
+        )
 
     @property
     def unique_id(self) -> str:
@@ -103,11 +117,40 @@ class ElementsBulb(APIBulb):
 
     @property
     def brightness(self) -> int | None:
-        """Convert brightness from 0-100 to 0-255 range."""
+        """Return the brightness if supported."""
+        if not self._supports_brightness:
+            _LOGGER.warning(f"Brightness is not supported by {self.name}")
+            return None
+
         try:
             return math.ceil(int(self._data[PACKET_BRIGHTNESS]) / 100 * 255)
         except (KeyError, ValueError) as e:
             _LOGGER.warning(f"Invalid brightness value: {e}")
+            return None
+
+    @property
+    def color_temp(self) -> int | None:
+        """Return the color temperature."""
+        if not self._supports_color_temp:
+            _LOGGER.warning(f"Color temperature is not supported by {self.name}")
+            return None
+
+        packet_temp = self._data.get(PACKET_COLOR_TEMP)
+        if not packet_temp:
+            return None
+        return _decode_color_temp(packet_temp, self.min_mireds, self.max_mireds)
+
+    @property
+    def rgb_color(self) -> tuple[int, int, int] | None:
+        """Return the RGB color."""
+        if not self._supports_color:
+            _LOGGER.warning(f"Color is not supported by {self.name}")
+            return None
+
+        try:
+            return tuple(int(rgb) for rgb in self._data[PACKET_RGB_COLOR].split(":"))
+        except (ValueError, KeyError) as e:
+            _LOGGER.warning(f"Invalid RGB color value: {e}")
             return None
 
     @property
@@ -126,6 +169,30 @@ class ElementsBulb(APIBulb):
     def model(self) -> str:
         return self._data[PACKET_MODEL]
 
+    # TODO show effects only if available
+    @property
+    def effect_list(self) -> list[str] | None:
+        """Return available effects."""
+        return [
+            "christmas",
+            "colorCycle",
+            "festival",
+            "halloween",
+            "randomColor",
+            "rhythm",
+            "none",
+        ]
+
+    # TODO max_mireds update based on bulb
+    @property
+    def max_mireds(self) -> int:
+        return 400
+
+    # TODO min_mireds update based on bulb
+    @property
+    def min_mireds(self) -> int:
+        return 154
+
     @property
     def mqtt_topics(self) -> list[str]:
         """Return MQTT topics for the light."""
@@ -139,13 +206,56 @@ class ElementsBulb(APIBulb):
         await self._async_send_updates({"type": PACKET_SWITCH, "value": value})
 
     async def set_brightness(self, value: int):
-        """Set the brightness level (0-255)."""
+        """Set the brightness level (0-255), if supported."""
+        if not self._supports_brightness:
+            _LOGGER.warning(f"Brightness is not supported by {self.name}")
+            return
+
         try:
             await self._async_send_updates(
                 {"type": PACKET_BRIGHTNESS, "value": str(math.ceil(value / 255 * 100))}
             )
         except ValueError as e:
             _LOGGER.error(f"Failed to set brightness: {e}")
+
+    async def set_color(self, value: tuple[int, int, int]):
+        """Set the RGB color, if supported."""
+        if not self._supports_color:
+            _LOGGER.warning(f"Color is not supported by {self.name}")
+            return
+
+        try:
+            await self._async_send_updates(
+                {"type": PACKET_RGB_COLOR, "value": ":".join(str(v) for v in value)}
+            )
+        except Exception as e:
+            _LOGGER.error(f"Failed to set color for {self.unique_id}: {e}")
+
+    async def set_temperature(self, temp_mireds: int):
+        """Set the color temperature in mireds, if supported."""
+        if not self._supports_color_temp:
+            _LOGGER.warning(f"Color temperature is not supported by {self.name}")
+            return
+
+        try:
+            await self._async_send_updates(
+                {
+                    "type": PACKET_COLOR_TEMP,
+                    "value": _encode_color_temp(temp_mireds, self.min_mireds, self.max_mireds),
+                }
+            )
+        except Exception as e:
+            _LOGGER.error(f"Failed to set color temperature for {self.unique_id}: {e}")
+
+    # TODO set effects only if available
+    async def set_effect(self, effect: str, enable: bool):
+        """Set a special effect."""
+        try:
+            await self._async_send_updates(
+                {"type": effect, "value": PACKET_VALUE_ON if enable else PACKET_VALUE_OFF}
+            )
+        except Exception as e:
+            _LOGGER.error(f"Failed to set effect {effect} for {self.unique_id}: {e}")
 
     async def _async_send_updates(self, *messages: dict[str, Any]):
         """Send updates to the light via MQTT."""
@@ -170,75 +280,3 @@ class ElementsBulb(APIBulb):
             self._data.update(packet)
         except (KeyError, ValueError) as e:
             _LOGGER.warning(f"Failed to update bulb {self.unique_id}: {e}")
-
-
-class ElementsColorBulb(ElementsBulb):
-    """A Wifi Elements color bulb."""
-
-    @property
-    def color_temp(self) -> int | None:
-        """Return the color temperature."""
-        packet_temp = self._data.get(PACKET_COLOR_TEMP)
-        if not packet_temp:
-            return None
-        return _decode_color_temp(packet_temp, self.min_mireds, self.max_mireds)
-
-    @property
-    def effect_list(self) -> list[str] | None:
-        """Return available effects."""
-        return [
-            "christmas",
-            "colorCycle",
-            "festival",
-            "halloween",
-            "randomColor",
-            "rhythm",
-            "none",
-        ]
-
-    @property
-    def max_mireds(self) -> int:
-        return 400
-
-    @property
-    def min_mireds(self) -> int:
-        return 154
-
-    @property
-    def rgb_color(self) -> tuple[int, int, int] | None:
-        """Return the RGB color."""
-        try:
-            return tuple(int(rgb) for rgb in self._data[PACKET_RGB_COLOR].split(":"))
-        except (ValueError, KeyError) as e:
-            _LOGGER.warning(f"Invalid RGB color value: {e}")
-            return None
-
-    async def set_color(self, value: tuple[int, int, int]):
-        """Set the RGB color."""
-        try:
-            await self._async_send_updates(
-                {"type": PACKET_RGB_COLOR, "value": ":".join(str(v) for v in value)}
-            )
-        except Exception as e:
-            _LOGGER.error(f"Failed to set color for {self.unique_id}: {e}")
-
-    async def set_effect(self, effect: str, enable: bool):
-        """Set a special effect."""
-        try:
-            await self._async_send_updates(
-                {"type": effect, "value": PACKET_VALUE_ON if enable else PACKET_VALUE_OFF}
-            )
-        except Exception as e:
-            _LOGGER.error(f"Failed to set effect {effect} for {self.unique_id}: {e}")
-
-    async def set_temperature(self, temp_mireds: int):
-        """Set the color temperature in mireds."""
-        try:
-            await self._async_send_updates(
-                {
-                    "type": PACKET_COLOR_TEMP,
-                    "value": _encode_color_temp(temp_mireds, self.min_mireds, self.max_mireds),
-                }
-            )
-        except Exception as e:
-            _LOGGER.error(f"Failed to set color temperature for {self.unique_id}: {e}")

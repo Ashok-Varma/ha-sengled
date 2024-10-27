@@ -18,14 +18,14 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from .api import ElementsBulb, ElementsColorBulb
+from .api import ElementsBulb
 from .const import ATTRIBUTION, DOMAIN, SUPPORTED_DEVICES
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ElementsLightEntity(ElementsBulb, LightEntity):
-    """Represents a Sengled light bulb that supports basic brightness control."""
+    """Represents a Sengled light bulb that supports brightness, color, and temperature control dynamically."""
 
     _attr_attribution = ATTRIBUTION
     _attr_should_poll = False
@@ -34,6 +34,12 @@ class ElementsLightEntity(ElementsBulb, LightEntity):
         """Initialize a basic light entity."""
         super().__init__(discovery)
         self._api = api
+
+        # Determine supported features from 'supportAttributes'
+        support_attributes = self._data.get("supportAttributes", "").split(",")
+        self._supports_brightness = "brightness" in support_attributes
+        self._supports_color = "color" in support_attributes
+        self._supports_color_temp = "colorTemperature" in support_attributes
 
     def update_bulb(self, payload: dict) -> None:
         """Update bulb state."""
@@ -45,11 +51,11 @@ class ElementsLightEntity(ElementsBulb, LightEntity):
         _LOGGER.debug("Turn on %s with attributes %r", self.name, kwargs)
         if not kwargs:
             await self.set_power(True)
-        if ATTR_BRIGHTNESS in kwargs:
+        if self._supports_brightness and ATTR_BRIGHTNESS in kwargs:
             await self.set_brightness(kwargs[ATTR_BRIGHTNESS])
-        if ATTR_RGB_COLOR in kwargs:
+        if self._supports_color and ATTR_RGB_COLOR in kwargs:
             await self.set_color(kwargs[ATTR_RGB_COLOR])
-        if ATTR_COLOR_TEMP in kwargs:
+        if self._supports_color_temp and ATTR_COLOR_TEMP in kwargs:
             await self.set_temperature(kwargs[ATTR_COLOR_TEMP])
         if ATTR_EFFECT in kwargs:
             effect = kwargs[ATTR_EFFECT]
@@ -73,8 +79,23 @@ class ElementsLightEntity(ElementsBulb, LightEntity):
 
     @property
     def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
-        """Return supported color modes."""
-        return {ColorMode.BRIGHTNESS}
+        """Return supported color modes based on device capabilities."""
+        modes = set()
+        if self._supports_color_temp:
+            modes.add(ColorMode.COLOR_TEMP)
+        if self._supports_color:
+            modes.add(ColorMode.RGB)
+        if self._supports_brightness:
+            modes.add(ColorMode.BRIGHTNESS)
+        return modes
+
+    # TODO show effects only if available
+    @property
+    def supported_features(self) -> LightEntityFeature:
+        """Return supported features based on device capabilities."""
+        if self._supports_color:
+            return LightEntityFeature.EFFECT
+        return 0
 
     def __repr__(self) -> str:
         """String representation for debugging purposes."""
@@ -86,30 +107,16 @@ class ElementsLightEntity(ElementsBulb, LightEntity):
         )
 
 
-class ElementsColorLightEntity(ElementsColorBulb, ElementsLightEntity):
-    """Represents a Sengled color light bulb supporting additional features."""
-
-    @property
-    def supported_features(self) -> LightEntityFeature:
-        """Return supported features for color lights."""
-        return LightEntityFeature.EFFECT
-
-    @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
-        """Return supported color modes for color lights."""
-        return {ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP, ColorMode.RGB}
-
-
 def pick_light(discovery: DiscoveryInfoType):
     """Select which light entity to use based on discovery info."""
     try:
         if discovery["typeCode"] in SUPPORTED_DEVICES:
-            return ElementsColorLightEntity
+            return ElementsLightEntity
     except KeyError:
         _LOGGER.error("Device type not found in discovery: %s", discovery)
         return None
 
-    _LOGGER.info("Using default light entity for discovery: %s", discovery)
+    _LOGGER.warning("%s Device Integration not tested, defaulting to generic Light.\nDetails : %s", discovery["typeCode"], discovery)
     return ElementsLightEntity
 
 
