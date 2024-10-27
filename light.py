@@ -116,7 +116,7 @@ def pick_light(discovery: DiscoveryInfoType):
         _LOGGER.error("Device type not found in discovery: %s", discovery)
         return None
 
-    _LOGGER.info("%s Device Integration not tested, defaulting to generic Light.\nDetails : %s", discovery["typeCode"], discovery)
+    _LOGGER.warning("%s Device Integration not tested, defaulting to generic Light.\nDetails : %s", discovery["typeCode"], discovery)
     return ElementsLightEntity
 
 
