@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .api import ElementsBulb, ElementsColorBulb
-from .const import ATTRIBUTION, DOMAIN
+from .const import ATTRIBUTION, DOMAIN, SUPPORTED_DEVICES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class ElementsColorLightEntity(ElementsColorBulb, ElementsLightEntity):
 def pick_light(discovery: DiscoveryInfoType):
     """Pick which light implementation to use."""
     try:
-        if discovery["typeCode"] == "W21-N13":
+        if discovery["typeCode"] in SUPPORTED_DEVICES:
             return ElementsColorLightEntity
     except KeyError:
         return None
