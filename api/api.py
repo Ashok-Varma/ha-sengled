@@ -14,6 +14,7 @@ import asyncio_mqtt as mqtt
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.helpers.discovery import load_platform
 
 from ..const import DOMAIN
 from .api_bulb import APIBulb
@@ -143,11 +144,11 @@ class API:
                     _LOGGER.error(f"Failed to discover lights: HTTP {resp.status}")
                     return []
                 data = await resp.json()
+
                 for device in data["deviceList"]:
-                    self._hass.helpers.discovery.load_platform(
-                        Platform.LIGHT, DOMAIN, device, {}
-                    )
+                    load_platform(self._hass, Platform.LIGHT, DOMAIN, device, {})
                 _LOGGER.info("API discovery complete")
+
         except aiohttp.ClientError as e:
             _LOGGER.error(f"Error discovering lights: {e}")
 
