@@ -93,14 +93,20 @@ class API:
             _LOGGER.error(f"Error fetching server info: {e}")
 
     async def _async_setup_mqtt(self):
-        """Set up MQTT client."""
-        for attempt in range(3):  # Retry logic
+        """Setup MQTT client with proper TLS context and retry logic."""
+
+        # Create a thread to run blocking I/O for SSL context creation
+        loop = asyncio.get_running_loop()
+        tls_context = await loop.run_in_executor(None, ssl.create_default_context)
+
+        # Retry logic for the MQTT connection
+        for attempt in range(3):  # Try connecting up to 3 times
             try:
                 client = mqtt.Client(
                     self._inception_url.hostname,
                     self._inception_url.port,
                     client_id=f"{self._jsession_id}@lifeApp",
-                    tls_context=ssl.create_default_context(),
+                    tls_context=tls_context,
                     transport="websockets",
                     websocket_headers={
                         "Cookie": f"JSESSIONID={self._jsession_id}",
@@ -109,22 +115,24 @@ class API:
                     websocket_path=self._inception_url.path,
                 )
 
-                await client.connect()
+                await client.connect()  # Connect the client
                 self._mqtt = client
 
+                # Subscribe the lights to MQTT topics after successful connection
                 async with self._lights_mutex:
                     lights = tuple(self._lights.values())
                 for light in lights:
                     await self._subscribe_light(light)
 
-                _LOGGER.info("MQTT client ready")
-                break
+                _LOGGER.info("MQTT client connected and ready on attempt %d", attempt + 1)
+                break  # Exit the retry loop if the connection was successful
+
             except mqtt.error.MqttConnectError as e:
                 _LOGGER.warning(f"MQTT connection attempt {attempt+1} failed: {e}")
-                if attempt < 2:
+                if attempt < 2:  # Retry with exponential backoff (2, 4 seconds)
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
                 else:
-                    raise
+                    raise  # Re-raise the error if all retries have failed
 
     async def _async_discover_lights(self) -> list[DiscoveryInfoType]:
         """Get a list of HASS-friendly discovered devices."""
