@@ -1,4 +1,4 @@
-"""A next-gen integration for Sengled lights."""
+"""A integration for Sengled lights."""
 from __future__ import annotations
 
 import logging
@@ -31,10 +31,10 @@ PLATFORMS = [Platform.LIGHT]
 
 async def async_setup_entry(hass: HomeAssistant, config: ConfigEntry) -> bool:
     """Set up the platform API."""
-    _LOGGER.info("Setup SengledNG package")
+    _LOGGER.info("Setup Sengled package")
 
     api = API(hass, config.data[CONF_USERNAME], config.data[CONF_PASSWORD])
     hass.data[DOMAIN] = api
-    hass.async_create_background_task(api.async_start(), "SengledNG")
+    hass.async_create_background_task(api.async_start(), "Sengled")
 
     return True

@@ -16,7 +16,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-class SengledNGConfigFlow(ConfigFlow, domain=DOMAIN):
+class SengledConfigFlow(ConfigFlow, domain=DOMAIN):
     """Example config flow."""
 
     # The schema version of the entries that it creates

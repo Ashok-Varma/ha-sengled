@@ -1,4 +1,4 @@
-"""API implmentation for SengledNG"""
+"""API implmentation for Sengled"""
 import asyncio
 from http import HTTPStatus
 import json

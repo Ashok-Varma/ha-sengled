@@ -1,4 +1,4 @@
-"""SengledNG light platform."""
+"""Sengled light platform."""
 from __future__ import annotations
 
 import logging
