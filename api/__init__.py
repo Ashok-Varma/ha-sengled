@@ -1,4 +1,4 @@
-"""API implmentation for SengledNG"""
+"""API implmentation for Sengled"""
 
 
 from .api import API, AuthError
