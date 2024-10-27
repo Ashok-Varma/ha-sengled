@@ -48,3 +48,27 @@ BULB_W21N11 = {
     ],
     "deviceAnimations": [],
 }
+
+BULB_W21N11HDL = {
+  "deviceUuid": "80:A0:36:C7:3E:49",
+  "category": "wifielement",
+  "typeCode": "W31-N11HDL",
+  "deviceBleFlag": null,
+  "attributeList": [
+    {"name": "brightness", "value": "70"},
+    {"name": "consumptionTime", "value": "54910223"},
+    {"name": "deviceRssi", "value": "-72"},
+    {"name": "identifyNO", "value": "ESP8266"},
+    {"name": "name", "value": "Temp Lamp"},
+    {"name": "online", "value": "1"},
+    {"name": "productCode", "value": "wifielement"},
+    {"name": "startTime", "value": "2023-02-18 04:02:06"},
+    {"name": "supportAttributes", "value": "brightness"},
+    {"name": "switch", "value": "0"},
+    {"name": "timeZone", "value": "America/Los_Angeles"},
+    {"name": "typeCode", "value": "W31-N11HDL"},
+    {"name": "update", "value": "success"},
+    {"name": "version", "value": "V1.0.0.8"}
+  ],
+  "deviceAnimations": []
+}
