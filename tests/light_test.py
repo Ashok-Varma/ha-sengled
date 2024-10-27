@@ -10,7 +10,7 @@ def test_pick_light_default():
 
 
 def test_pick_light_color_wifi():
-    assert light.pick_light(bulbs.BULB_W21N13) is light.ElementsColorLightEntity
+    assert light.pick_light(bulbs.BULB_W21N13) is light.ElementsLightEntity
 
 
 def test_pick_light_white_wifi():

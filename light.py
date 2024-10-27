@@ -95,7 +95,7 @@ class ElementsLightEntity(ElementsBulb, LightEntity):
         """Return supported features based on device capabilities."""
         if self._supports_color:
             return LightEntityFeature.EFFECT
-        return 0
+        return LightEntityFeature(0)
 
     def __repr__(self) -> str:
         """String representation for debugging purposes."""
