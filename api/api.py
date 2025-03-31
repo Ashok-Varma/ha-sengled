@@ -114,6 +114,8 @@ class API:
                         "X-Requested-With": "com.sengled.life2",
                     },
                     websocket_path=self._inception_url.path,
+                    retry_first_connection=True,
+                    keepalive=60,
                 )
 
                 await client.connect()  # Connect the client
